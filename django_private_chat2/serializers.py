@@ -1,4 +1,4 @@
-from .models import MessageModel, DialogsModel, UserModel, UploadedFile
+from .models import MessageModel, MessageReadModel, DialogsModel, UserModel, UploadedFile
 from typing import Optional, Dict
 import os
 
@@ -11,6 +11,7 @@ def serialize_file_model(m: UploadedFile) -> Dict[str, str]:
 def serialize_message_model(m: MessageModel, user_id):
     sender_pk = m.sender.pk
     is_out = sender_pk == user_id
+    message_read = MessageReadModel.objects.filter(message__id=m.id, recipient__id=user_id).first()
     # TODO: add forwards
     # TODO: add replies
     obj = {
@@ -18,7 +19,7 @@ def serialize_message_model(m: MessageModel, user_id):
         "text": m.text,
         "sent": int(m.created.timestamp()),
         "edited": int(m.modified.timestamp()),
-        "read": m.read,
+        "read": message_read.read if message_read else True,
         "file": serialize_file_model(m.file) if m.file else None,
         "sender": str(sender_pk),
         "recipient": str(m.recipient.pk),
@@ -30,20 +31,20 @@ def serialize_message_model(m: MessageModel, user_id):
 
 def serialize_dialog_model(m: DialogsModel, user_id):
     username_field = UserModel.USERNAME_FIELD
-    other_user_pk, other_user_username = UserModel.objects.filter(pk=m.user1.pk).values_list('pk',
-                                                                                             username_field).first() \
-        if m.user2.pk == user_id else UserModel.objects.filter(pk=m.user2.pk).values_list('pk', username_field).first()
-    unread_count = MessageModel.get_unread_count_for_dialog_with_user(sender=other_user_pk, recipient=user_id)
-    last_message: Optional[MessageModel] = MessageModel.get_last_message_for_dialog(sender=other_user_pk,
-                                                                                    recipient=user_id)
+    qs = m.users.values_list('pk', username_field).exclude(pk=user_id)
+    other_users_pk = [value[0] for value in qs]
+    other_users_username = [value[1] for value in qs]
+    
+    unread_count = MessageReadModel.get_unread_count_for_dialog_with_user(dialog=m.pk, recipient=user_id)
+    last_message: Optional[MessageModel] = MessageReadModel.get_last_message_for_dialog(dialog=m.pk, recipient=user_id)
     last_message_ser = serialize_message_model(last_message, user_id) if last_message else None
     obj = {
         "id": m.id,
         "created": int(m.created.timestamp()),
         "modified": int(m.modified.timestamp()),
-        "other_user_id": str(other_user_pk),
+        "other_user_id": [str(pk) for pk in other_users_pk], 
         "unread_count": unread_count,
-        "username": other_user_username,
+        "username": [str(username) for username in other_users_username],
         "last_message": last_message_ser
     }
     return obj

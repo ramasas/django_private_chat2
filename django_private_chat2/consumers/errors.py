@@ -10,6 +10,7 @@ class ErrorTypes(enum.IntEnum):
     InvalidRandomId = 5
     FileMessageInvalid = 6
     FileDoesNotExist = 7
+    InvalidDialogPk = 8
 
 
 ErrorDescription = Tuple[ErrorTypes, str]

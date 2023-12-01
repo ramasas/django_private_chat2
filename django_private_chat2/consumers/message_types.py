@@ -12,18 +12,19 @@ except ImportError:
 
 class MessageTypeTextMessage(TypedDict):
     text: str
-    user_pk: str
+    group_pk: str
     random_id: int
 
 
 class MessageTypeMessageRead(TypedDict):
     user_pk: str
+    group_pk: str
     message_id: int
 
 
 class MessageTypeFileMessage(TypedDict):
     file_id: str
-    user_pk: str
+    group_pk: str
     random_id: int
 
 
@@ -54,7 +55,7 @@ class OutgoingEventMessageRead(NamedTuple):
             "msg_type": MessageTypes.MessageRead,
             "message_id": self.message_id,
             "sender": self.sender,
-            "receiver": self.receiver
+            "receiver": self.receiver,
         })
 
 
@@ -62,8 +63,8 @@ class OutgoingEventNewTextMessage(NamedTuple):
     random_id: int
     text: str
     sender: str
-    receiver: str
     sender_username: str
+    receiver: str
     type: str = "new_text_message"
 
     def to_json(self) -> str:
@@ -72,8 +73,8 @@ class OutgoingEventNewTextMessage(NamedTuple):
             "random_id": self.random_id,
             "text": self.text,
             "sender": self.sender,
-            "receiver": self.receiver,
             "sender_username": self.sender_username,
+            "receiver": self.receiver,
         })
 
 
@@ -81,8 +82,8 @@ class OutgoingEventNewFileMessage(NamedTuple):
     db_id: int
     file: Dict[str, str]
     sender: str
-    receiver: str
     sender_username: str
+    receiver: str
     type: str = "new_file_message"
 
     def to_json(self) -> str:
@@ -91,8 +92,8 @@ class OutgoingEventNewFileMessage(NamedTuple):
             "db_id": self.db_id,
             "file": self.file,
             "sender": self.sender,
-            "receiver": self.receiver,
             "sender_username": self.sender_username,
+            "receiver": self.receiver,
         })
 
 
