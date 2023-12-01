@@ -10,13 +10,6 @@ from django.core.exceptions import ValidationError
 def get_dialogs_to_add(u: AbstractBaseUser) -> Awaitable[Set[int]]:
     l = DialogsModel.get_dialogs_for_user(u)
     return set(list(sum(l, ())))
-  
-
-#@database_sync_to_async
-#def get_groups_to_add(u: AbstractBaseUser) -> Awaitable[Set[int]]:
-#    l = GroupModel.get_groups_for_user(u)
-#    return set(list(sum(l, ())))
-
 
 @database_sync_to_async
 def get_user_by_pk(pk: str) -> Awaitable[Optional[AbstractBaseUser]]:

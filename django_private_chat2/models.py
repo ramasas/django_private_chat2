@@ -76,36 +76,7 @@ class DialogsModel(TimeStampedModel):
     def get_dialogs_for_user(user: AbstractBaseUser):
         return DialogsModel.objects.filter(users__in=[user]).values_list('pk',)
         #return DialogsModel.objects.filter(Q(user1=user) | Q(user2=user)).values_list('user1__pk', 'user2__pk')
-
-"""
-class GroupModel(TimeStampedModel):
-    id = models.BigAutoField(primary_key=True, verbose_name=_("Id"))
-    name = models.CharField(max_length=100, unique=True)
-    description = models.CharField(max_length=100, null=True, blank=True)
-    members = models.ManyToManyField(settings.AUTH_USER_MODEL, verbose_name=_("Members"), related_name="+")
-
-    class Meta:
-        verbose_name = _("Group")
-        verbose_name_plural = _("Groups")
-
-    def __str__(self):
-        return _("Group ") + f"{self.name}"
-
-    @staticmethod
-    def group_exists(name) -> Optional[Any]:
-        return GroupModel.objects.filter(Q(name=name)).first()
-
-    @staticmethod
-    def create_if_not_exists(name, users):
-        res = GroupModel.group_exists(name)
-        if not res:
-            group = GroupModel.objects.create(name=name)
-            group.users.set(users)
-
-    @staticmethod
-    def get_groups_for_user(user: AbstractBaseUser):
-        return GroupModel.objects.filter(members__in=[user]).values_list('pk',)
-    """    
+        
 
 class MessageModel(TimeStampedModel, SoftDeletableModel):
     id = models.BigAutoField(primary_key=True, verbose_name=_("Id"))
@@ -115,14 +86,7 @@ class MessageModel(TimeStampedModel, SoftDeletableModel):
                                verbose_name=_("Author"),
                                related_name='from_user',
                                db_index=True)
-
-    # This MessageModel will be read by this recipient
-    #recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
-    #                              verbose_name=_("Recipient"),
-    #                              related_name='to_user',
-    #                              null=True,
-    #                              db_index=True)
-
+    
     # This MessageModel belongs to this chat group
     recipient = models.ForeignKey(DialogsModel, on_delete=models.CASCADE,
                                   verbose_name=_("Group"),
@@ -132,22 +96,9 @@ class MessageModel(TimeStampedModel, SoftDeletableModel):
     text = models.TextField(verbose_name=_("Text"), blank=True)
     file = models.ForeignKey(UploadedFile, related_name='message', on_delete=models.DO_NOTHING,
                              verbose_name=_("File"), blank=True, null=True)
-
-    #read = models.BooleanField(verbose_name=_("Read"), default=False)
+    
     all_objects = models.Manager()
-
-
-    """
-    @staticmethod
-    def get_unread_count_for_dialog_with_user(sender, recipient):
-        return MessageModel.objects.filter(sender_id=sender, recipient_id=recipient, read=False).count()
-
-    @staticmethod
-    def get_last_message_for_dialog(sender, recipient):
-        return MessageModel.objects.filter(
-            Q(sender_id=sender, recipient_id=recipient) | Q(sender_id=recipient, recipient_id=sender)) \
-            .select_related('sender', 'recipient').first()
-        """
+    
     
     def __str__(self):
         return str(self.pk)

@@ -34,17 +34,7 @@ class MessagesModelList(LoginRequiredMixin, ListView):
     def get_queryset(self):
         dialogs = DialogsModel.get_dialogs_for_user(self.request.user)
         qs = MessageModel.objects.filter(recipient__in=dialogs).prefetch_related('sender', 'recipient', 'file')
-        """
-        if self.kwargs.get('dialog_with'):
-            qs = MessageModel.objects \
-                .filter(Q(recipient_user=self.request.user, sender=self.kwargs['dialog_with']) |
-                        Q(sender=self.request.user, recipient_user=self.kwargs['dialog_with'])) \
-                .select_related('sender', 'recipient_user')
-        else:
-            qs = MessageModel.objects \
-                .filter(Q(recipient_user=self.request.user) | 
-                        Q(sender=self.request.user)).prefetch_related('sender', 'recipient_user', 'file')
-            """
+
         return qs.order_by('-created')
 
     def render_to_response(self, context, **response_kwargs):
@@ -81,29 +71,6 @@ class DialogsModelList(LoginRequiredMixin, ListView):
             'data': data
         }
         return JsonResponse(return_data, **response_kwargs)
-    
-"""
-class GroupModelList(LoginRequiredMixin, ListView):
-    http_method_names = ['get', ]
-    paginate_by = getattr(settings, 'DIALOGS_PAGINATION', 20)
-
-    def get_queryset(self):
-        qs = GroupModel.objects.filter(Q(users=self.request.user.pk))
-        return qs.order_by('-created')
-
-    def render_to_response(self, context, **response_kwargs):
-        # TODO: add online status
-        user_pk = self.request.user.pk
-        data = [serialize_discussion_model(i, user_pk) for i in context['object_list']]
-        page: Page = context.pop('page_obj')
-        paginator: Paginator = context.pop('paginator')
-        return_data = {
-            'page': page.number,
-            'pages': paginator.num_pages,
-            'data': data
-        }
-        return JsonResponse(return_data, **response_kwargs)
-    """
 
 
 class SelfInfoView(LoginRequiredMixin, DetailView):

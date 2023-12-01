@@ -5,7 +5,7 @@ from . import views
 
 app_name = 'django_private_chat2'
 websocket_urlpatterns = [
-    re_path(r'^chat_ws$', consumers.ChatConsumer.as_asgi()),
+    re_path(r'^ws$', consumers.ChatConsumer.as_asgi()),
 ]
 
 urlpatterns = [
