@@ -17,8 +17,8 @@ def serialize_message_model(m: MessageModel, user_id):
     obj = {
         "id": m.id,
         "text": m.text,
-        "sent": int(m.created.timestamp()),
-        "edited": int(m.modified.timestamp()),
+        "sent": int(m.created.timestamp()) * 1000,
+        "edited": int(m.modified.timestamp()) * 1000,
         "read": message_read.read if message_read else True,
         "file": serialize_file_model(m.file) if m.file else None,
         "sender": str(sender_pk),
@@ -40,8 +40,10 @@ def serialize_dialog_model(m: DialogsModel, user_id):
     last_message_ser = serialize_message_model(last_message, user_id) if last_message else None
     obj = {
         "id": m.id,
-        "created": int(m.created.timestamp()),
-        "modified": int(m.modified.timestamp()),
+        "name": m.name,
+        "description": m.description,
+        "created": int(m.created.timestamp()) * 1000,
+        "modified": int(m.modified.timestamp()) * 1000,
         "other_user_id": [str(pk) for pk in other_users_pk], 
         "unread_count": unread_count,
         "username": [str(username) for username in other_users_username],

@@ -30,16 +30,18 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    'django_private_chat2',
-
     # 3rd party
+    "corsheaders",
     'channels',
+
+    'django_private_chat2',
     'django_extensions',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -116,6 +118,7 @@ ADMIN_MEDIA_PREFIX = '/static/admin/'
 LOGIN_REDIRECT_URL = '/admin'
 LOGIN_URL = '/admin/login/'
 ALLOWED_HOSTS = ['*']
+CORS_ALLOWED_ORIGINS = ["http://localhost:4200",]
 
 ASGI_APPLICATION = 'example.example.routing.application'
 
@@ -146,14 +149,13 @@ LOGGING = {
     },
     'loggers': {
         'django.db.backends': {
-            'level': 'DEBUG',
+            'level': 'INFO',
             'handlers': ['console'],
         }
     },
     # Uncomment this to view django_private_chat2's logs
-
-    # 'root': {
-    #     'handlers': ['console'],
-    #     'level': 'INFO',
-    # },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
 }

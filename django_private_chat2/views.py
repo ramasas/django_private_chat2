@@ -35,7 +35,7 @@ class MessagesModelList(LoginRequiredMixin, ListView):
         dialogs = DialogsModel.get_dialogs_for_user(self.request.user)
         qs = MessageModel.objects.filter(recipient__in=dialogs).prefetch_related('sender', 'recipient', 'file')
 
-        return qs.order_by('-created')
+        return qs.order_by('created')
 
     def render_to_response(self, context, **response_kwargs):
         user_pk = self.request.user.pk

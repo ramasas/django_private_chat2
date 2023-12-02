@@ -1,0 +1,47 @@
+<div class="nb-theme-default" [formGroup]="formGroup">
+  <div>
+    Hello, {{ self?.username }} ({{ self?.pk }})
+  </div>
+
+  <div>
+    Chat room list:
+    <mat-selection-list [multiple]="false" formControlName="chatroom">
+      <mat-list-option *ngFor="let r of chatrooms$ | async" [value]="r">
+        {{ r.id }}.{{ r.username }}
+      </mat-list-option>
+    </mat-selection-list>
+  </div>
+
+  <nb-chat title="Nebular Conversational UI">
+    <nb-chat-message *ngFor="let msg of messages$ | async"
+                     [message]="msg.text"
+                     [sender]="msg.sender_username"
+                     [reply]="isReply(msg.sender)"
+                     [date]="msg.sent">
+    </nb-chat-message>
+
+    <nb-chat-form (send)="sendMessage($event)" [dropFiles]="true">
+    </nb-chat-form>
+  </nb-chat>
+
+  <!--
+  <div *ngFor="let evt of receivedEvt$ | async">
+    <pre>{{ evt | json }}</pre>
+  </div>
+  <div *ngFor="let msg of chatTextMessageEvt$ | async">
+    <pre>{{ msg | json }}</pre>
+  </div>
+
+  <div>
+
+    <mat-form-field class="example-form-field">
+      <mat-label>Message</mat-label>
+      <input matInput type="text" formControlName="message">
+
+    </mat-form-field>
+
+    <button mat-raised-button color="accent" (click)="send()">Send</button>
+  </div>
+  -->
+</div>
+
