@@ -635,3 +635,4 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
+/example/frontend_ng/.vscode
