@@ -1,41 +1,59 @@
-import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormControl, Validators } from '@angular/forms';
-import { BehaviorSubject, catchError, of } from 'rxjs';
-import { Chatroom, ChatroomService, TextMessage, MessageEvt, MessageTypes, TextMessageEvt } from './chatroom.service';
+import { AfterViewInit, Component, OnInit, ViewChild } from '@angular/core';
+import { FormBuilder } from '@angular/forms';
+import { MatSelectionList, MatSelectionListChange } from '@angular/material/list';
+import { BehaviorSubject, catchError, map, of, Subject, switchMap, throttleTime, timer } from 'rxjs';
+import { ChatroomService } from './chatroom.service';
+import { Chatroom, TextMessage, MessageEvt, MessageTypes, TextMessageEvt, IsTypingEvt, TypingStoppedEvt, ChatroomMessage } from './chatroom.model';
 
 @Component({
   selector: 'app-chatroom',
   templateUrl: './chatroom.component.html',
   styleUrls: ['./chatroom.component.scss']
 })
-export class ChatroomComponent implements OnInit {
+export class ChatroomComponent implements OnInit, AfterViewInit {
 
-  self?: { username: string, pk: number };
+  @ViewChild('chatroomList') chatroomList!: MatSelectionList;
+
   chatrooms: BehaviorSubject<Chatroom[]> = new BehaviorSubject<Chatroom[]>([]);
   messages: BehaviorSubject<TextMessage[]> = new BehaviorSubject<TextMessage[]>([]);
-  //messages: BehaviorSubject<TextMessageEvt[]> = new BehaviorSubject<TextMessageEvt[]>([]);
 
-  formGroup = this.fb.group({
-    chatroom: new FormControl<Chatroom | undefined>(undefined),
-    message: ['', Validators.required],
-  });
+  private isTyping = new Subject<string>();
 
   constructor(
     private fb: FormBuilder,
     private service: ChatroomService) {
 
-    this.service.reqSelf()
-      .pipe(catchError(e => {
-        return of(null);
-      }))
-      .subscribe(res => {
-        if (res == null) return;
-        this.self = res;
+
+    // Send isTyping or typingStopped event to the chatroom
+    this.isTyping.asObservable()
+      .pipe(
+        throttleTime(5000),
+        switchMap(event => {
+          if (this.service.state.chatroom !== undefined) {
+            this.service.send({
+              msg_type: MessageTypes.IsTyping,
+              dialog_pk: this.service.state.chatroom.id.toString()
+            });
+          }
+          return timer(5000); // Delay for 5 seconds before sending typingStopped event
+        }),
+      )
+      .subscribe(event => {
+        if (this.service.state.chatroom !== undefined) {
+          this.service.send({
+            msg_type: MessageTypes.TypingStopped,
+            dialog_pk: this.service.state.chatroom.id.toString()
+          });
+        }
       });
 
   }
 
   ngOnInit(): void {
+
+  }
+
+  ngAfterViewInit(): void {
     this.reqChatrooms();
     this.reqMessages();
 
@@ -51,15 +69,12 @@ export class ChatroomComponent implements OnInit {
       .subscribe(res => {
         if (res == null) return;
         const data = res.data as Chatroom[];
-        const currChatroom = this.formGroup.value.chatroom;
-        if (!currChatroom) {
-          //this.formGroup.patchValue({ chatroom: data[0] });
-          console.log(currChatroom, data[0], this.formGroup.value)
-        }
-
         this.chatrooms.next(data);
-      });
 
+        if (data.length) {
+          this.service.state.chatroom = data[0];
+        }
+      });
   }
 
   reqMessages() {
@@ -79,36 +94,60 @@ export class ChatroomComponent implements OnInit {
     if (evt == null) return;
 
     switch (evt.msg_type) {
+      case MessageTypes.IsTyping:
+        this.handleIsTypingEvt(evt as IsTypingEvt);
+        break;
+      case MessageTypes.TypingStopped:
+        this.handleTypingStoppedEvt(evt as TypingStoppedEvt);
+        break;
       case MessageTypes.TextMessage:
-        const textEvt = evt as TextMessageEvt;
-        const newMessage: TextMessage = {
-          id: textEvt.random_id,
-          text: textEvt.text,
-          sent: new Date(),
-          edited: new Date(),
-          read: true,
-          file: null,
-          sender: textEvt.sender,
-          sender_username: textEvt.sender_username,
-          recipient: textEvt.receiver,
-          out: textEvt.sender_username == this.self?.username,
-        };
-        //console.log(textEvt, newMessage);
-        this.messages.next([...this.messages.value, newMessage]);
-
+        this.handleTextMessageEvt(evt as TextMessageEvt);
         break;
     }
 
   }
 
-  send() {
-    if (!!this.formGroup.value.message) {
-      this.service.send(this.formGroup.value.message);
-    }
+  selectChatroom(event: MatSelectionListChange) {
+    this.service.state.chatroom = event.options[0].value;
+
+  }
+
+  onInputChange(event: string) {
+    this.isTyping.next(event);
+    console.log(event);
+    //this.service.send({
+    //  msg_type: MessageTypes.IsTyping,
+    //});
   }
 
   sendMessage(event: any) {
-    this.service.send(event.message);
+    if (this.service.state.chatroom === undefined) return;
+
+    const files = !event.files ? [] : event.files.map((file: any) => {
+      return {
+        url: file.src,
+        type: file.type,
+        icon: 'file-text-outline',
+      };
+    });
+
+    if (files.length) {
+      // File message
+      this.service.send({
+        msg_type: MessageTypes.FileMessage,
+        text: event.message,
+        dialog_pk: this.service.state.chatroom.id.toString(),
+      });
+
+    } else {
+      // Text message
+      this.service.send({
+        msg_type: MessageTypes.TextMessage,
+        text: event.message,
+        dialog_pk: this.service.state.chatroom.id.toString(),
+      });
+    }
+
     /*const files = !event.files ? [] : event.files.map((file) => {
       return {
         url: file.src,
@@ -140,8 +179,48 @@ export class ChatroomComponent implements OnInit {
   }
 
   get messages$() {
-    return this.messages.asObservable();
+    //console.log(this.messages.value, this.service.state.chatroom)
+    return this.messages.asObservable()
+      .pipe(map(arr => arr.filter(n => parseInt(n.recipient) === this.service.state.chatroom?.id)));
 
+  }
+
+  get state() {
+    return this.service.state;
+  }
+
+  private handleIsTypingEvt(evt: IsTypingEvt) {
+
+    /*const newMessage: ChatroomMessage = {
+      text: '...',
+      sender: evt.sender,
+      sender_username: evt.sender_username,
+      recipient: evt.receiver,
+      out: false,
+    };*/
+
+  }
+
+  private handleTypingStoppedEvt(evt: TypingStoppedEvt) {
+
+  }
+
+  private handleTextMessageEvt(evt: TextMessageEvt) {
+
+    const newMessage: TextMessage = {
+      id: evt.random_id,
+      text: evt.text,
+      sent: new Date(),
+      edited: new Date(),
+      read: true,
+      file: null,
+      sender: evt.sender,
+      sender_username: evt.sender_username,
+      recipient: evt.receiver,
+      out: evt.sender_username === this.state.self_username,
+    };
+    //console.log(evt, newMessage);
+    this.messages.next([...this.messages.value, newMessage]);
   }
 
 }

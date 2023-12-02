@@ -1,18 +1,18 @@
-<div class="nb-theme-default" [formGroup]="formGroup">
+<div class="nb-theme-default">
   <div>
-    Hello, {{ self?.username }} ({{ self?.pk }})
+    Hello, {{ state.self_username }} (ID: {{ state.self_id }})
   </div>
 
   <div>
     Chat room list:
-    <mat-selection-list [multiple]="false" formControlName="chatroom">
-      <mat-list-option *ngFor="let r of chatrooms$ | async" [value]="r">
-        {{ r.id }}.{{ r.name }}
+    <mat-selection-list #chatroomList [multiple]="false" (selectionChange)="selectChatroom($event)">
+      <mat-list-option *ngFor="let r of chatrooms$ | async; first as isFirst" [value]="r" [selected]="isFirst">
+        {{ r.name }} (ID: {{ r.id }})
       </mat-list-option>
     </mat-selection-list>
   </div>
 
-  <nb-chat title="My Happy Chatroom">
+  <nb-chat [title]="state.chatroom?.name || 'Untitled'" scrollBottom="true">
     <nb-chat-message *ngFor="let msg of messages$ | async"
                      [message]="msg.text"
                      [sender]="msg.sender_username"
@@ -20,8 +20,9 @@
                      [date]="msg.sent">
     </nb-chat-message>
 
-    <nb-chat-form (send)="sendMessage($event)" [dropFiles]="true">
-    </nb-chat-form>
+    <nb-chat-form (send)="sendMessage($event)"
+                  [dropFiles]="true"
+                  (onInputChange)="onInputChange($event)"></nb-chat-form>
   </nb-chat>
 
   <!--
