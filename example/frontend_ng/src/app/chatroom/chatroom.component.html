@@ -7,16 +7,16 @@
     Chat room list:
     <mat-selection-list [multiple]="false" formControlName="chatroom">
       <mat-list-option *ngFor="let r of chatrooms$ | async" [value]="r">
-        {{ r.id }}.{{ r.username }}
+        {{ r.id }}.{{ r.name }}
       </mat-list-option>
     </mat-selection-list>
   </div>
 
-  <nb-chat title="Nebular Conversational UI">
+  <nb-chat title="My Happy Chatroom">
     <nb-chat-message *ngFor="let msg of messages$ | async"
                      [message]="msg.text"
                      [sender]="msg.sender_username"
-                     [reply]="isReply(msg.sender)"
+                     [reply]="msg.out"
                      [date]="msg.sent">
     </nb-chat-message>
 

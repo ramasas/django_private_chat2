@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormControl, Validators } from '@angular/forms';
 import { BehaviorSubject, catchError, of } from 'rxjs';
-import { Chatroom, ChatroomService, TextMessage, TextMessageEvt } from './chatroom.service';
+import { Chatroom, ChatroomService, TextMessage, MessageEvt, MessageTypes, TextMessageEvt } from './chatroom.service';
 
 @Component({
   selector: 'app-chatroom',
@@ -39,7 +39,8 @@ export class ChatroomComponent implements OnInit {
     this.reqChatrooms();
     this.reqMessages();
 
-    this.service.textMessageEvt$.subscribe()
+    // Received new text message
+    this.service.receivedEvt$.subscribe(this.handleReceivedEvt.bind(this));
   }
 
   reqChatrooms() {
@@ -71,6 +72,32 @@ export class ChatroomComponent implements OnInit {
         const data = res.data as TextMessage[];
         this.messages.next(data);
       });
+
+  }
+
+  handleReceivedEvt(evt: MessageEvt) {
+    if (evt == null) return;
+
+    switch (evt.msg_type) {
+      case MessageTypes.TextMessage:
+        const textEvt = evt as TextMessageEvt;
+        const newMessage: TextMessage = {
+          id: textEvt.random_id,
+          text: textEvt.text,
+          sent: new Date(),
+          edited: new Date(),
+          read: true,
+          file: null,
+          sender: textEvt.sender,
+          sender_username: textEvt.sender_username,
+          recipient: textEvt.receiver,
+          out: textEvt.sender_username == this.self?.username,
+        };
+        //console.log(textEvt, newMessage);
+        this.messages.next([...this.messages.value, newMessage]);
+
+        break;
+    }
 
   }
 
@@ -107,10 +134,6 @@ export class ChatroomComponent implements OnInit {
     }*/
   }
 
-  isReply(sender: string): boolean {
-    return parseInt(sender) == this.self?.pk;
-  }
-
   get chatrooms$() {
     return this.chatrooms.asObservable();
 
@@ -119,14 +142,6 @@ export class ChatroomComponent implements OnInit {
   get messages$() {
     return this.messages.asObservable();
 
-  }
-
-  get receivedEvt$() {
-    return this.service.receivedEvt$;
-  }
-
-  get receivedTextMessageEvt$() {
-    return this.service.textMessageEvt$;
   }
 
 }

@@ -28,6 +28,7 @@ export interface MessageEvt {
 "{\"msg_type\": 9, \"sender\": \"1\", \"unread_count\": 0}"
 */
 export interface TextMessageEvt extends MessageEvt {
+  random_id: number;
   text: string;
   sender: string; // actually int
   sender_username: string;
@@ -44,6 +45,8 @@ export interface PaginatedResponse {
 
 export interface Chatroom {
   id: number;
+  name: string;
+  description: string;
   other_users_id: number[];
   username: string[];
   created: Date;
@@ -77,8 +80,9 @@ export class ChatroomService implements OnInit {
   };
   ws!: ReconnectingWebSocket;
 
+  receivedEvtList: MessageEvt[] = [];
+  receivedEvt = new BehaviorSubject<MessageEvt>(null as unknown as MessageEvt);
 
-  receivedEvt: BehaviorSubject<MessageEvt[]> = new BehaviorSubject<MessageEvt[]>([]);
 
 
   private apiUrl = `http://localhost:8000/`;
@@ -104,7 +108,8 @@ export class ChatroomService implements OnInit {
     console.log(evt.data);
     // {"msg_type": 3, "random_id": -1549658336, "text": "777", "sender": "1", "sender_username": "admin", "receiver": "1"}
     const data: MessageEvt = JSON.parse(evt.data);
-    this.receivedEvt.next([...this.receivedEvt.value, ...[data]]);
+    this.receivedEvtList.push(data);
+    this.receivedEvt.next(data);
     //if (errMsg) {
     //  this.snackbar.open(errMsg, 'OK', { duration: 3000 });
     //}
@@ -138,20 +143,8 @@ export class ChatroomService implements OnInit {
     this.ws.send(JSON.stringify({ msg_type: 3, text: data, dialog_pk: '1', random_id: this.generateRandomId(), }));
   }
 
-  get textMessageEvt$(): Observable<TextMessageEvt[]> {
-    return this.receivedEvt$.pipe(
-      map(
-        (arr) => arr.filter(n => n.msg_type === MessageTypes.TextMessage)
-          .map((n: MessageEvt) => {
-            return n as TextMessageEvt;
-          })
-      ),
 
-      shareReplay(1),
-    );
-  }
-
-  get receivedEvt$(): Observable<MessageEvt[]> {
+  get receivedEvt$(): Observable<MessageEvt> {
     return this.receivedEvt.asObservable();
   }
 
