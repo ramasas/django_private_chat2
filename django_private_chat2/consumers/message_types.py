@@ -28,6 +28,14 @@ class MessageTypeFileMessage(TypedDict):
     random_id: int
 
 
+class MessageTypeIsTyping(TypedDict):
+    group_pk: str
+    
+
+class MessageTypeTypingStopped(TypedDict):
+    group_pk: str
+
+
 class MessageTypes(enum.IntEnum):
     WentOnline = 1
     WentOffline = 2

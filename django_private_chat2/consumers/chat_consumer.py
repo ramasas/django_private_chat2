@@ -9,6 +9,7 @@ from .db_operations import get_dialogs_to_add, get_unread_count, \
     get_user_by_pk, get_dialog_by_pk, get_file_by_id, get_message_by_id, \
     save_file_message, save_text_message, mark_message_as_read
 from .message_types import MessageTypes, MessageTypeMessageRead, MessageTypeFileMessage, MessageTypeTextMessage, \
+    MessageTypeIsTyping, MessageTypeTypingStopped, \
     OutgoingEventMessageRead, OutgoingEventNewTextMessage, OutgoingEventNewUnreadCount, OutgoingEventMessageIdCreated,\
     OutgoingEventNewFileMessage, OutgoingEventIsTyping, OutgoingEventStoppedTyping, OutgoingEventWentOnline, OutgoingEventWentOffline
 
@@ -39,9 +40,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                                 )._asdict())
               
 
-    async def broadcast(self, dialog_pk: int, ev):
+    async def broadcast(self, dialog_pk: int, ev, exclude_self=False):
         members = (await DialogsModel.objects.aget(id=dialog_pk)).users.all()
         async for member in members:
+            if exclude_self and self.user.pk == member.pk:
+                continue
             await self.channel_layer.group_send(str(member.pk), ev)
         #dialog = await database_sync_to_async(DialogsModel.objects.aget)(id=dialog_pk)
         #async for member in (await dialog).users.all():
@@ -96,22 +99,48 @@ class ChatConsumer(AsyncWebsocketConsumer):
             logger.info(f"Ignoring message {msg_type.name}")
         else:
             if msg_type == MessageTypes.IsTyping:
-                dialogs = await get_dialogs_to_add(self.user)
-                logger.info(f"User {self.user.pk} is typing, sending 'is_typing' to {dialogs} dialog groups")
-                for d in dialogs:
-                    if str(d) != self.group_name:
-                        #await self.channel_layer.group_send(str(d), OutgoingEventIsTyping(user_pk=str(self.user.pk))._asdict())
-                        await self.broadcast(d, OutgoingEventIsTyping(user_pk=str(self.user.pk))._asdict())
+                data: MessageTypeIsTyping
+                if 'dialog_pk' not in data:
+                    return ErrorTypes.MessageParsingError, "'dialog_pk' not present in data"
+                elif 'dialog_pk' in data and not isinstance(data['dialog_pk'], str):
+                    return ErrorTypes.InvalidDialogPk, "'dialog_pk' should be a string"
+                else:
+                    dialog_pk = data['dialog_pk'] if 'dialog_pk' in data else None
+                    #dialogs = await get_dialogs_to_add(self.user)
+                    recipient: Optional[DialogsModel] = await get_dialog_by_pk(dialog_pk)
+                    logger.info(f"DB check if discussion group {dialog_pk} exists resulted in {recipient}")
+                    if not recipient:
+                        return ErrorTypes.InvalidDialogPk, f"Discussion group with pk {dialog_pk} does not exist"
+                    else:
+                        logger.info(f"User {self.user.pk} is typing, sending 'is_typing' to {recipient.pk} dialog groups")
+                        await self.broadcast(recipient.pk, OutgoingEventIsTyping(user_pk=str(self.user.pk))._asdict(), True)
+                        #for d in dialogs:
+                        #    if str(d) != self.group_name:
+                        #        #await self.channel_layer.group_send(str(d), OutgoingEventIsTyping(user_pk=str(self.user.pk))._asdict())
+                        #        await self.broadcast(d, OutgoingEventIsTyping(user_pk=str(self.user.pk))._asdict())
                 return None
             
             elif msg_type == MessageTypes.TypingStopped:
-                dialogs = await get_dialogs_to_add(self.user)
-                logger.info(
-                    f"User {self.user.pk} has stopped typing, sending 'stopped_typing' to {dialogs} dialog groups")
-                for d in dialogs:
-                    if str(d) != self.group_name:
-                        #await self.channel_layer.group_send(str(d), OutgoingEventStoppedTyping(user_pk=str(self.user.pk))._asdict())
-                        await self.broadcast(d, OutgoingEventStoppedTyping(user_pk=str(self.user.pk))._asdict())
+                data: MessageTypeTypingStopped
+                if 'dialog_pk' not in data:
+                    return ErrorTypes.MessageParsingError, "'dialog_pk' not present in data"
+                elif 'dialog_pk' in data and not isinstance(data['dialog_pk'], str):
+                    return ErrorTypes.InvalidDialogPk, "'dialog_pk' should be a string"
+                else:
+                    dialog_pk = data['dialog_pk'] if 'dialog_pk' in data else None
+                    #dialogs = await get_dialogs_to_add(self.user)
+                    recipient: Optional[DialogsModel] = await get_dialog_by_pk(dialog_pk)
+                    logger.info(f"DB check if discussion group {dialog_pk} exists resulted in {recipient}")
+                    if not recipient:
+                        return ErrorTypes.InvalidDialogPk, f"Discussion group with pk {dialog_pk} does not exist"
+                    else:
+                        logger.info(
+                            f"User {self.user.pk} has stopped typing, sending 'stopped_typing' to {recipient.pk} dialog groups")
+                        await self.broadcast(recipient.pk, OutgoingEventStoppedTyping(user_pk=str(self.user.pk))._asdict(), True)
+                        #for d in dialogs:
+                        #    if str(d) != self.group_name:
+                        #        #await self.channel_layer.group_send(str(d), OutgoingEventStoppedTyping(user_pk=str(self.user.pk))._asdict())
+                        #        await self.broadcast(d, OutgoingEventStoppedTyping(user_pk=str(self.user.pk))._asdict())
                 return None
             
             elif msg_type == MessageTypes.MessageRead:
@@ -144,7 +173,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     #    OutgoingEventMessageRead(message_id=mid,
                     #                             sender=dialog_pk,
                     #                             receiver=self.group_name)._asdict())
-                    recipient: Optional[AbstractBaseUser] = await get_dialog_by_pk(dialog_pk)
+                    recipient: Optional[DialogsModel] = await get_dialog_by_pk(dialog_pk)
                     logger.info(f"DB check if discussion group {dialog_pk} exists resulted in {recipient}")
                     if not recipient:
                         return ErrorTypes.InvalidDialogPk, f"Discussion group with pk {dialog_pk} does not exist"
@@ -169,7 +198,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 if 'file_id' not in data:
                     return ErrorTypes.MessageParsingError, "'file_id' not present in data"
                 elif 'dialog_pk' not in data:
-                    return ErrorTypes.MessageParsingError, "'user_pk' and 'dialog_pk' not present in data"
+                    return ErrorTypes.MessageParsingError, "'dialog_pk' not present in data"
                 elif 'random_id' not in data:
                     return ErrorTypes.MessageParsingError, "'random_id' not present in data"
                 elif data['file_id'] == '':
@@ -226,7 +255,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 if 'text' not in data:
                     return ErrorTypes.MessageParsingError, "'text' not present in data"
                 elif 'dialog_pk' not in data:
-                    return ErrorTypes.MessageParsingError, "'user_pk' and 'dialog_pk' not present in data"
+                    return ErrorTypes.MessageParsingError, "'dialog_pk' not present in data"
                 elif 'random_id' not in data:
                     return ErrorTypes.MessageParsingError, "'random_id' not present in data"
                 elif data['text'] == '':
