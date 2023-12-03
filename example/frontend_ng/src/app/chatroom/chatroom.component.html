@@ -12,12 +12,27 @@
     </mat-selection-list>
   </div>
 
+  <!--<div *ngFor="let msg of messages$ | async">
+    {{ msg | json }}
+  </div>-->
   <nb-chat [title]="state.chatroom?.name || 'Untitled'" scrollBottom="true">
+    <div *nbCustomMessage="'typing'; let data">
+      <em>{{ data.typer_username }} is typing...</em>
+    </div>
+
     <nb-chat-message *ngFor="let msg of messages$ | async"
-                     [message]="msg.text"
+                     [type]="msg.type"
+                     [message]="msg.message"
                      [sender]="msg.sender_username"
-                     [reply]="msg.out"
-                     [date]="msg.sent">
+                     [reply]="msg.reply"
+                     [date]="msg.date">
+    </nb-chat-message>
+
+    <nb-chat-message *ngFor="let msg of extraMessages$ | async"
+                     [type]="msg.type"
+                     [sender]="msg.sender_username"
+                     [reply]="msg.reply"
+                     [customMessageData]="msg.customMessageData">
     </nb-chat-message>
 
     <nb-chat-form (send)="sendMessage($event)"

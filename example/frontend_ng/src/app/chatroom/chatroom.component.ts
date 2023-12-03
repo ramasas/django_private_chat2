@@ -3,7 +3,7 @@ import { FormBuilder } from '@angular/forms';
 import { MatSelectionList, MatSelectionListChange } from '@angular/material/list';
 import { BehaviorSubject, catchError, map, of, Subject, switchMap, throttleTime, timer } from 'rxjs';
 import { ChatroomService } from './chatroom.service';
-import { Chatroom, TextMessage, MessageEvt, MessageTypes, TextMessageEvt, IsTypingEvt, TypingStoppedEvt, ChatroomMessage } from './chatroom.model';
+import { Chatroom, MessageEvt, MessageTypes, TextMessageEvt, IsTypingEvt, TypingStoppedEvt, ChatroomMessage } from './chatroom.model';
 
 @Component({
   selector: 'app-chatroom',
@@ -15,7 +15,8 @@ export class ChatroomComponent implements OnInit, AfterViewInit {
   @ViewChild('chatroomList') chatroomList!: MatSelectionList;
 
   chatrooms: BehaviorSubject<Chatroom[]> = new BehaviorSubject<Chatroom[]>([]);
-  messages: BehaviorSubject<TextMessage[]> = new BehaviorSubject<TextMessage[]>([]);
+  messages: BehaviorSubject<ChatroomMessage[]> = new BehaviorSubject<ChatroomMessage[]>([]);
+  extraMessages: BehaviorSubject<ChatroomMessage[]> = new BehaviorSubject<ChatroomMessage[]>([]);
 
   private isTyping = new Subject<string>();
 
@@ -84,8 +85,39 @@ export class ChatroomComponent implements OnInit, AfterViewInit {
       }))
       .subscribe(res => {
         if (res == null) return;
-        const data = res.data as TextMessage[];
-        this.messages.next(data);
+        const data = res.data as {
+          id: number,
+          text: string,
+          sent: Date,
+          edited: Date,
+          read: boolean,
+          file?: {
+            id: string,
+            url: string,
+            name: string,
+            size: number,
+          },
+          sender: string,
+          recipient: string,
+          sender_username: string,
+          out: boolean,
+        }[];
+        // Convert response into ChatroomMessage
+        const messages = data.map(n => {
+          return {
+            id: n.id,
+            type: n.file == null ? 'text' : 'file', // Support text or file message only
+            message: n.text || '',
+            reply: n.out,
+            sender: n.sender,
+            sender_username: n.sender_username,
+            recipient: n.recipient,
+            date: n.sent,
+            files: n.file == null ? undefined : [n.file],
+          } as ChatroomMessage;
+        });
+
+        this.messages.next(messages);
       });
 
   }
@@ -114,14 +146,10 @@ export class ChatroomComponent implements OnInit, AfterViewInit {
 
   onInputChange(event: string) {
     this.isTyping.next(event);
-    console.log(event);
-    //this.service.send({
-    //  msg_type: MessageTypes.IsTyping,
-    //});
   }
 
   sendMessage(event: any) {
-    if (this.service.state.chatroom === undefined) return;
+    if (this.state.chatroom === undefined) return;
 
     const files = !event.files ? [] : event.files.map((file: any) => {
       return {
@@ -133,44 +161,21 @@ export class ChatroomComponent implements OnInit, AfterViewInit {
 
     if (files.length) {
       // File message
-      this.service.send({
+      this.service.sendMessage({
         msg_type: MessageTypes.FileMessage,
         text: event.message,
-        dialog_pk: this.service.state.chatroom.id.toString(),
+        dialog_pk: this.state.chatroom.id.toString(),
       });
 
     } else {
       // Text message
-      this.service.send({
+      this.service.sendMessage({
         msg_type: MessageTypes.TextMessage,
         text: event.message,
-        dialog_pk: this.service.state.chatroom.id.toString(),
+        dialog_pk: this.state.chatroom.id.toString(),
       });
     }
 
-    /*const files = !event.files ? [] : event.files.map((file) => {
-      return {
-        url: file.src,
-        type: file.type,
-        icon: 'file-text-outline',
-      };
-    });
-
-    this.messages.push({
-      text: event.message,
-      date: new Date(),
-      reply: true,
-      type: files.length ? 'file' : 'text',
-      files: files,
-      user: {
-        name: 'Jonh Doe',
-        avatar: 'https://i.gifer.com/no.gif',
-      },
-    });
-    const botReply = this.chatShowcaseService.reply(event.message);
-    if (botReply) {
-      setTimeout(() => { this.messages.push(botReply) }, 500);
-    }*/
   }
 
   get chatrooms$() {
@@ -185,40 +190,75 @@ export class ChatroomComponent implements OnInit, AfterViewInit {
 
   }
 
+  get extraMessages$() {
+    //console.log(this.messages.value, this.service.state.chatroom)
+    return this.extraMessages.asObservable()
+      .pipe(map(arr => arr.filter(n => parseInt(n.recipient) === this.service.state.chatroom?.id)));
+
+  }
+
   get state() {
     return this.service.state;
   }
 
   private handleIsTypingEvt(evt: IsTypingEvt) {
+    if (this.state.chatroom === undefined) return;
 
-    /*const newMessage: ChatroomMessage = {
-      text: '...',
-      sender: evt.sender,
-      sender_username: evt.sender_username,
-      recipient: evt.receiver,
-      out: false,
-    };*/
+    const idx = this.state.chatroom?.other_user_id.findIndex(n => n === evt.user_pk);
+    if (idx < 0) return;
 
+    const typer = parseInt(this.state.chatroom?.other_user_id[idx]);
+    const typer_username = this.state.chatroom?.username[idx];
+
+    const newMessage: ChatroomMessage = {
+      id: typer,
+      type: 'typing',
+      message: '',
+      customMessageData: { typer: typer, typer_username: typer_username },
+      reply: false,
+      sender: evt.user_pk,
+      sender_username: typer_username,
+      recipient: this.state.chatroom.id.toString(),
+      date: new Date(),
+    } as ChatroomMessage;
+
+    //console.log(evt, newMessage);
+    const extra = this.extraMessages.value;
+    this.extraMessages.next([
+      ...extra.filter(n => n.id !== typer),
+      newMessage
+    ]);
+    
   }
 
   private handleTypingStoppedEvt(evt: TypingStoppedEvt) {
+    if (this.state.chatroom === undefined) return;
+
+    const idx = this.state.chatroom?.other_user_id.findIndex(n => n === evt.user_pk);
+    if (idx < 0) return;
+
+    const typer = parseInt(this.state.chatroom?.other_user_id[idx]);
+
+    const extra = this.extraMessages.value;
+    this.extraMessages.next([
+      ...extra.filter(n => n.id !== typer),
+    ]);
 
   }
 
   private handleTextMessageEvt(evt: TextMessageEvt) {
 
-    const newMessage: TextMessage = {
+    const newMessage: ChatroomMessage = {
       id: evt.random_id,
-      text: evt.text,
-      sent: new Date(),
-      edited: new Date(),
-      read: true,
-      file: null,
+      type: 'text',
+      message: evt.text,
+      reply: evt.sender_username === this.state.self_username,
       sender: evt.sender,
       sender_username: evt.sender_username,
       recipient: evt.receiver,
-      out: evt.sender_username === this.state.self_username,
-    };
+      date: new Date(),
+    } as ChatroomMessage;
+
     //console.log(evt, newMessage);
     this.messages.next([...this.messages.value, newMessage]);
   }

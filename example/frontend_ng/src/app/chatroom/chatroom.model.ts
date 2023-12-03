@@ -52,7 +52,7 @@ export interface Chatroom {
   id: number;
   name: string;
   description: string;
-  other_users_id: number[];
+  other_user_id: string[];  // actuall int[]
   username: string[];
   created: Date;
   modified: Date;
@@ -60,6 +60,24 @@ export interface Chatroom {
   unread_count: number;
 }
 
+
+export interface ChatroomMessage {
+  id: number;
+  type: string;
+  message: string;
+  customMessageData?: {
+    [key: string]: any,
+  },
+  reply: boolean;
+  sender: string; // actuall int
+  sender_username: string;
+  recipient: string;  // actuall int
+  date: Date;
+  files?: [];
+  avatar?: string;
+}
+
+/*
 export interface ChatroomMessage {
   text: string;
   sender: string; // actually int
@@ -80,3 +98,4 @@ export interface TextMessage extends ChatroomMessage {
   //recipient: string;  // actuall int
   //out: boolean;
 }
+*/
