@@ -2,6 +2,18 @@ from .models import MessageModel, MessageReadModel, DialogsModel, UserModel, Upl
 from typing import Optional, Dict
 import os
 
+def serialize_files_model(files: list[UploadedFile]) -> list[dict[str, str]]:
+    serialized_files = []
+    for file in files:
+        print(file)
+        serialized_files.append({
+            'id': str(file.id),
+            'url': file.file.url,
+            'size': file.file.size,
+            'name': os.path.basename(file.file.name)
+        })
+    return serialized_files
+
 
 def serialize_file_model(m: UploadedFile) -> Dict[str, str]:
     return {'id': str(m.id), 'url': m.file.url,

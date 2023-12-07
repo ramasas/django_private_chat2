@@ -1,9 +1,9 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, OnInit } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import ReconnectingWebSocket from 'reconnecting-websocket';
 import { BehaviorSubject,catchError, Observable, of } from 'rxjs';
-import { MessageEvt, Chatroom, PaginatedResponse } from './chatroom.model';
+import { MessageEvt, Chatroom, PaginatedResponse, MessageTypes } from './chatroom.model';
 
 export class ChatroomState {
   receivedEvtList: MessageEvt[] = [];
@@ -110,15 +110,55 @@ export class ChatroomService implements OnInit {
   }
 
 
+  uploadFiles(files: File[]) {
+
+    // Create a new FormData object
+    const formData = new FormData();
+    files.forEach(file => {
+      console.log(file);
+      formData.append('files', file);
+    });
+    console.log(formData);
+    // Get the CSRF token from the cookie
+    const csrfToken = this.getCookie('csrftoken');
+    const headers = new HttpHeaders({
+      'X-CSRFToken': csrfToken || ''
+    });
+
+    // Send the files to the Django view using the fetch API
+    return this.http.post<any>(`${this.apiUrl}upload/`, formData, { headers });
+  }
+
   send(data: MessageEvt) {
     this.ws.send(JSON.stringify(data));
   }
 
-  sendMessage(data: { msg_type: number, text: string, dialog_pk: string } ) {
+  sendTextMessage(data: { text: string, dialog_pk: string }) {
     this.ws.send(JSON.stringify({
       ...data,
+      msg_type: MessageTypes.TextMessage,
       random_id: this.generateRandomId(),
     }));
+  }
+
+  sendFileMessage(data: { file: [], dialog_pk: string }) {
+    this.ws.send(JSON.stringify({
+      ...data,
+      msg_type: MessageTypes.FileMessage,
+      random_id: this.generateRandomId(),
+    }));
+    /*
+    let sendOutgoingFileMessage (sock: WebSocket) (user_pk: string) (file_data: MessageModelFile) (self_info: UserInfoResponse option) =
+    printfn "Sending file message: '%s', user_pk:'%s'" file_data.id user_pk
+    let randomId = generateRandomId()
+    let data = [
+      "file_id", Encode.string file_data.id
+        "user_pk", Encode.string user_pk
+        "random_id", Encode.int(int32 randomId)
+    ]
+    sock.send(msgTypeEncoder MessageTypes.FileMessage data)
+    self_info |> Option.map(fun x -> createMessageBoxFromOutgoingMessage file_data.name user_pk x.pk x.username randomId(Some file_data))
+    */
   }
 
 
@@ -129,6 +169,11 @@ export class ChatroomService implements OnInit {
   private generateRandomId() {
     const r = Math.random();
     return -Math.floor(r * Math.pow(2, 31));
+  }
+
+  private getCookie(name: string) {
+    const cookieValue = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return cookieValue ? cookieValue.pop() : '';
   }
 
 }

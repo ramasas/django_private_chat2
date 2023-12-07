@@ -150,32 +150,32 @@ export class ChatroomComponent implements OnInit, AfterViewInit {
 
   sendMessage(event: any) {
     if (this.state.chatroom === undefined) return;
-
-    const files = !event.files ? [] : event.files.map((file: any) => {
+    
+    /*const files = !event.files ? [] : event.files.map((file: any) => {
       return {
         url: file.src,
         type: file.type,
         icon: 'file-text-outline',
       };
-    });
+    });*/
+    const files = !event.files ? [] : event.files;
 
     if (files.length) {
+      console.log(event, files);
+      this.uploadFiles(files);
       // File message
-      this.service.sendMessage({
-        msg_type: MessageTypes.FileMessage,
+      /*this.service.sendFileMessage({
         text: event.message,
         dialog_pk: this.state.chatroom.id.toString(),
-      });
+      });*/
 
     } else {
       // Text message
-      this.service.sendMessage({
-        msg_type: MessageTypes.TextMessage,
+      this.service.sendTextMessage({
         text: event.message,
         dialog_pk: this.state.chatroom.id.toString(),
       });
     }
-
   }
 
   get chatrooms$() {
@@ -199,6 +199,29 @@ export class ChatroomComponent implements OnInit, AfterViewInit {
 
   get state() {
     return this.service.state;
+  }
+
+  private uploadFiles(files: File[]) {
+    this.service.uploadFiles(files).subscribe(res => {
+      console.log(res);
+    });
+    /*uploadFile(e.target.files, getCookie()).then((r) => {
+      if (r.tag === 0) {
+        console.log("Uploaded file :")
+        console.log(r.fields[0])
+        let user_pk = this.state.selectedDialog.id;
+        let uploadResp = r.fields[0];
+        let msgBox = sendOutgoingFileMessage(this.state.socket, user_pk, uploadResp, this.state.selfInfo);
+        console.log("sendOutgoingFileMessage result:");
+        console.log(msgBox);
+        if (msgBox) {
+          this.addMessage(msgBox);
+        }
+      } else {
+        console.log("File upload error")
+        toast.error(r.fields[0])
+      }
+    });*/
   }
 
   private handleIsTypingEvt(evt: IsTypingEvt) {
@@ -225,7 +248,7 @@ export class ChatroomComponent implements OnInit, AfterViewInit {
     //console.log(evt, newMessage);
     const extra = this.extraMessages.value;
     this.extraMessages.next([
-      ...extra.filter(n => n.id !== typer),
+      ...extra.filter(n => !(n.recipient === this.state.chatroom?.id.toString() && n.id === typer)),
       newMessage
     ]);
     
@@ -241,7 +264,7 @@ export class ChatroomComponent implements OnInit, AfterViewInit {
 
     const extra = this.extraMessages.value;
     this.extraMessages.next([
-      ...extra.filter(n => n.id !== typer),
+      ...extra.filter(n => !(n.recipient === this.state.chatroom?.id.toString() && n.id === typer)),
     ]);
 
   }

@@ -13,7 +13,7 @@ from .models import (
     DialogsModel,
     UploadedFile
 )
-from .serializers import serialize_message_model, serialize_dialog_model, serialize_file_model
+from .serializers import serialize_message_model, serialize_dialog_model, serialize_files_model
 from django.db.models import Q
 
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -23,6 +23,7 @@ from django.core.paginator import Page, Paginator
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser
 from django.urls import reverse_lazy
+from django import forms
 from django.forms import ModelForm
 import json
 
@@ -96,7 +97,24 @@ class SelfInfoView(LoginRequiredMixin, DetailView):
 # 500MB - 429916160
 # MAX_UPLOAD_SIZE = getattr(settings, 'MAX_FILE_UPLOAD_SIZE', 5242880)
 
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+class MultipleFileField(forms.FileField):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("widget", MultipleFileInput())
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        single_file_clean = super().clean
+        if isinstance(data, (list, tuple)):
+            result = [single_file_clean(d, initial) for d in data]
+        else:
+            result = single_file_clean(data, initial)
+        return result
+
 class UploadForm(ModelForm):
+    files = MultipleFileField()
     # TODO: max file size validation
     # def check_file(self):
     #     content = self.cleaned_data["file"]
@@ -109,7 +127,7 @@ class UploadForm(ModelForm):
 
     class Meta:
         model = UploadedFile
-        fields = ['file']
+        fields = ['files']
 
 
 class UploadView(LoginRequiredMixin, CreateView):
@@ -118,8 +136,16 @@ class UploadView(LoginRequiredMixin, CreateView):
     form_class = UploadForm
 
     def form_valid(self, form: UploadForm):
-        self.object = UploadedFile.objects.create(uploaded_by=self.request.user, file=form.cleaned_data['file'])
-        return JsonResponse(serialize_file_model(self.object))
+        files = self.request.FILES.getlist('files')
+        uploaded_files = []
+        print('~~~~~~~~~', files)
+        for file in files:
+            uploaded_file = UploadedFile.objects.create(uploaded_by=self.request.user, file=file)
+            uploaded_files.append(uploaded_file)
+        serialized_files = serialize_files_model(uploaded_files)
+        return JsonResponse(serialized_files, safe=False)
+        #self.object = UploadedFile.objects.create(uploaded_by=self.request.user, file=form.cleaned_data['file'])
+        #return JsonResponse(serialize_file_model(self.object))
 
     def form_invalid(self, form: UploadForm):
         context = self.get_context_data(form=form)
