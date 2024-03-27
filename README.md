@@ -5,4 +5,4 @@ Forked from https://github.com/Bearle/django_private_chat2
 
 Original package supports 1:1 dialogs only.
 
-Add suppor to 1:n dialogs.
+Add support to 1:n dialogs.
